@@ -1,11 +1,8 @@
 package com.pranshulgg.notesmaster;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.biometric.BiometricManager;
 import androidx.core.content.res.ResourcesCompat;
 
 import android.animation.ArgbEvaluator;
@@ -13,7 +10,6 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -21,63 +17,40 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.InputType;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
-import android.webkit.JsPromptResult;
-import android.webkit.JsResult;
-import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-public class SettingsActivity extends AppCompatActivity {
+public class ConfigLock extends AppCompatActivity {
     private WebView webview;
-    private boolean doubleBackToExitPressedOnce = false;
-    private ValueCallback<Uri[]> filePathCallback;
-    private static final int REQUEST_PERMISSION_CODE = 1;
-    private final static int FILECHOOSER_RESULTCODE = 1;
-    private final static int EXPORT_REQUEST_CODE = 2;
-    private static final int PERMISSION_REQUEST_CODE = 3;
-    private static final int SAVE_DOCUMENT_REQUEST_CODE = 2;
-    private static final int IMPORT_REQUEST_CODE = 3;
-
     private FrameLayout overlayLayout;
-    private String dataToSave;
+
     @Override
     public void onBackPressed() {
         if (webview.canGoBack()) {
             webview.goBack();
         } else {
             super.onBackPressed();
+
         }
     }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         SharedPreferences prefs = getSharedPreferences("theme_prefs", MODE_PRIVATE);
         boolean isDarkMode = prefs.getBoolean("theme_mode", false);
         setAppTheme(this, isDarkMode);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         overlayLayout = findViewById(R.id.overlayLayout);
@@ -102,182 +75,16 @@ public class SettingsActivity extends AppCompatActivity {
         webview.addJavascriptInterface(new NavigateActivityInterface(this), "OpenActivityInterface");
         webview.addJavascriptInterface(new BackActivityInterface(this), "BackActivityInterface");
         webview.addJavascriptInterface(new ShowSnackInterface(this), "ShowSnackMessage");
-        webview.addJavascriptInterface(new WebAppInterface(), "Android");
         webview.addJavascriptInterface(new AndroidFunctionActivityInterface(this), "AndroidFunctionActivityInterface");
 
-        webview.loadUrl("file:///android_asset/pages/settings.html");
+        webview.loadUrl("file:///android_asset/pages/configLockPage.html");
 
-        webview.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                checkBiometricSupportSwitch();
-            }
-        });
-        webview.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
-                new AlertDialog.Builder(view.getContext())
-                        .setTitle("Input error")
-                        .setMessage(message)
-                        .setPositiveButton("OK", (DialogInterface dialog, int which) -> result.confirm())
-                        .setOnDismissListener((DialogInterface dialog) -> result.confirm())
-                        .create()
-                        .show();
-                return true;
-            }
-
-
-            @Override
-            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
-                new AlertDialog.Builder(view.getContext())
-                        .setTitle("Confirm delete")
-                        .setMessage(message)
-                        .setPositiveButton("OK", (DialogInterface dialog, int which) -> result.confirm())
-                        .setNegativeButton("Cancel", (DialogInterface dialog, int which) -> result.cancel())
-                        .setOnDismissListener((DialogInterface dialog) -> result.cancel())
-                        .create()
-                        .show();
-                return true;
-            }
-
-            @Override
-            public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
-                final EditText input = new EditText(view.getContext());
-                input.setInputType(InputType.TYPE_CLASS_TEXT);
-                input.setText(defaultValue);
-                new AlertDialog.Builder(view.getContext())
-                        .setTitle("Confirm Delete")
-                        .setMessage(message)
-                        .setView(input)
-                        .setPositiveButton("OK", (DialogInterface dialog, int which) -> result.confirm(input.getText().toString()))
-                        .setNegativeButton("Cancel", (DialogInterface dialog, int which) -> result.cancel())
-                        .setOnDismissListener((DialogInterface dialog) -> result.cancel())
-                        .create()
-                        .show();
-                return true;
-            }
-
-
-        });
 
     }
-
-
 
     public void hideOverlay() {
         overlayLayout.setVisibility(View.GONE);
     }
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == FILECHOOSER_RESULTCODE) {
-            if (filePathCallback != null) {
-                Uri[] results = null;
-                if (resultCode == RESULT_OK && data != null) {
-                    String dataString = data.getDataString();
-                    if (dataString != null) {
-                        results = new Uri[]{Uri.parse(dataString)};
-                    }
-                }
-                filePathCallback.onReceiveValue(results);
-                filePathCallback = null;
-            }
-        } else if (requestCode == SAVE_DOCUMENT_REQUEST_CODE) {
-            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
-                saveToUri(data.getData());
-            } else {
-                Toast.makeText(this, "Error exporting", Toast.LENGTH_SHORT).show();
-            }
-        } else if (requestCode == IMPORT_REQUEST_CODE) {
-            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
-                importFromUri(data.getData());
-            } else {
-                Toast.makeText(this, "Error importing file", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-    public class WebAppInterface {
-        @JavascriptInterface
-        public void saveFile(String data) {
-            dataToSave = data;
-            openFilePickerExport();
-        }
-
-        @JavascriptInterface
-        public void importFile() {
-            openFilePickerImport();  // Open file picker for importing JSON data
-        }
-
-    }
-
-
-
-
-
-    private void openFilePickerExport() {
-        String currentDate = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
-        String fileName = "NotesMasterBackup_" + currentDate + ".json";
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, fileName);
-        startActivityForResult(intent, SAVE_DOCUMENT_REQUEST_CODE);
-    }
-    private void openFilePickerImport() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/json");
-        startActivityForResult(intent, IMPORT_REQUEST_CODE);
-    }
-
-    private void importFromUri(Uri uri) {
-        try {
-            InputStream inputStream = getContentResolver().openInputStream(uri);
-            if (inputStream != null) {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-                StringBuilder stringBuilder = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    stringBuilder.append(line);
-                }
-                reader.close();
-                inputStream.close();
-
-                String importedData = stringBuilder.toString();
-
-                String safeJson = JSONObject.quote(importedData);
-
-                runOnUiThread(() -> {
-                    String jsCode = "handleImportedData(" + safeJson + ");";
-                    webview.evaluateJavascript(jsCode, null);
-                });
-            }
-        } catch (Exception e) {
-            Toast.makeText(this, "Error reading file", Toast.LENGTH_LONG).show();
-            e.printStackTrace();
-        }
-    }
-
-
-
-    private void saveToUri(Uri uri) {
-        try {
-            OutputStream outputStream = getContentResolver().openOutputStream(uri);
-            if (outputStream != null) {
-                outputStream.write(dataToSave.getBytes());
-                outputStream.close();
-                Toast.makeText(this, "Backup saved", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Error", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Toast.makeText(this, "Error saving file", Toast.LENGTH_LONG).show();
-            e.printStackTrace();
-        }
-    }
-
     public class ShowSnackInterface {
         private final Context mContext;
 
@@ -321,34 +128,6 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
-
-
-    private void checkBiometricSupportSwitch() {
-        BiometricManager biometricManager = BiometricManager.from(this);
-
-        switch (biometricManager.canAuthenticate()) {
-            case BiometricManager.BIOMETRIC_SUCCESS:
-                break;
-
-            case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE:
-            case BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE:
-            case BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED:
-                callNotSupportedJavaScriptFunction();
-                break;
-
-            default:
-                callNotSupportedJavaScriptFunction();
-                break;
-        }
-    }
-
-    private void callNotSupportedJavaScriptFunction() {
-
-        webview.evaluateJavascript("javascript:notSupported();", null);
-    }
-
-
-
     public class NavigateActivityInterface {
         private final Context mContext;
 
@@ -361,8 +140,7 @@ public class SettingsActivity extends AppCompatActivity {
             Intent intent = null;
 
             switch (activityName) {
-                case "AboutPage":
-                    intent = new Intent(mContext, AboutPage.class);
+                case "--":
                     break;
                 default:
                     Toast.makeText(mContext, "Activity not found", Toast.LENGTH_SHORT).show();
@@ -371,10 +149,8 @@ public class SettingsActivity extends AppCompatActivity {
 
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             mContext.startActivity(intent);
-
         }
     }
-
 
     public class BackActivityInterface {
         private final Activity gActivity;
@@ -392,11 +168,10 @@ public class SettingsActivity extends AppCompatActivity {
         runOnUiThread(this::onBackPressed);
     }
 
-
     public class AndroidFunctionActivityInterface {
-        private SettingsActivity mActivity;
+        private ConfigLock mActivity;
 
-        AndroidFunctionActivityInterface(SettingsActivity activity) {
+        AndroidFunctionActivityInterface(ConfigLock activity) {
             mActivity = activity;
         }
 
@@ -408,20 +183,17 @@ public class SettingsActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     if (functiontype.equals("hideSurfaceOverlay")){
-                            hideOverlay();
+                        hideOverlay();
                         return;
                     }
                 }
             });
         }
     }
-
-
-
     public class AndroidInterface {
-        private SettingsActivity mActivity;
+        private ConfigLock mActivity;
 
-        AndroidInterface(SettingsActivity activity) {
+        AndroidInterface(ConfigLock activity) {
             mActivity = activity;
         }
 
@@ -439,14 +211,10 @@ public class SettingsActivity extends AppCompatActivity {
                     if (colorStatus != null && !colorStatus.isEmpty()) {
                         statusBarColor = Color.parseColor(colorStatus);
                         navigationBarColor = Color.parseColor(colorNav);
-                        if ("0colorOnly".equals(UiFlag)){
-                            systemUiVisibilityFlags = 0;
-                        }else if ("1".equals(UiFlag)) {
+                        if ("1".equals(UiFlag)) {
                             systemUiVisibilityFlags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-                            setAppTheme(mActivity, false);
                         } else {
                             systemUiVisibilityFlags = 0;
-                            setAppTheme(mActivity, true);
                         }
                     } else {
                         Toast.makeText(mActivity, "not found", Toast.LENGTH_SHORT).show();
@@ -496,12 +264,37 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
-    private class WebViewClientDemo extends WebViewClient {
+    private static class WebViewClientDemo extends WebViewClient {
         @Override
-        //Keep webview in app when clicking links
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
-            view.loadUrl(url);
-            return true;
+            if (isValidUrl(url)) {
+                if (shouldOpenInBrowser(url)) {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    view.getContext().startActivity(intent);
+                    return true;
+                } else {
+                    view.loadUrl(url);
+                    return false;
+                }
+            } else {
+                if (!isExcludedUrl(url)) {
+                    Context context = view.getContext();
+                    Toast.makeText(context, "Invalid link", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            }
+        }
+
+        private boolean isValidUrl(String url) {
+            return url != null && (url.startsWith("http") || url.startsWith("mailto:") || isExcludedUrl(url));
+        }
+
+        private boolean shouldOpenInBrowser(String url) {
+            return !isExcludedUrl(url);
+        }
+
+        private boolean isExcludedUrl(String url) {
+            return url.startsWith("file:///android_asset/pages/LabelsPage.html");
         }
     }
 
@@ -510,7 +303,6 @@ public class SettingsActivity extends AppCompatActivity {
         SharedPreferences prefs = context.getSharedPreferences("theme_prefs", Context.MODE_PRIVATE);
         prefs.edit().putBoolean("theme_mode", isDarkMode).apply();
 
-        // Apply the theme
         if (isDarkMode) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
             context.setTheme(R.style.ThemeMainBlackDark);
@@ -523,6 +315,5 @@ public class SettingsActivity extends AppCompatActivity {
                 );
         }
     }
-
 }
 
